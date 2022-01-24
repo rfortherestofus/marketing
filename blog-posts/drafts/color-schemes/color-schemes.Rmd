@@ -1,28 +1,226 @@
 ---
-title: "Choosing a bespoke color scheme"
+title: "Creating and applying bespoke color schemes"
 author: "Cara Thompson"
 date: "24/01/2022"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
+knitr::opts_chunk$set(echo = TRUE)
+library(magrittr)
+library(ggplot2)
+```
+
+### "Ooh look, a `ggplot()` plot!"
+
+In creating polished reports and visualisastions for our clients, that is never the reaction we're hoping for. Sure, the "I didn't know you could do that in R!" reaction is always fun, but what we want above all is for the plots and tables to blend in seamlessly with the rest of the client's aesthetic. Picking a color scheme that ties in with a client's brand or that evokes the subject matter behind the data is what allows the plot to contribute to, rather than detract from, the main story the client is seeking to tell. 
+
+This post explores how we go about choosing an appropriate color scheme and how to create `scale_fill/color_discrete/continous()` to align all plots with that colour scheme, using the example of our recent project with Colibri Consulting.
+
+
+## Step 1: Decide what colors to use
+
+In the case of this project, our client had a logo with two colors. She was able to give us the hex codes for those colours, which was handy, but there are plenty of online tools to help you pick out the hex colours in an image or even in a website. My personal go-to is [Color Picker Online](https://imagecolorpicker.com/en) which does what it says on the tin: it allows you to pinpoint different parts of an image or a website to extract their color codes. 
+
+So, back to Colibri Consulting. Our two starting colors were:
+- a deep purple: `#43d293`
+- a bright green: `#530577` 
+
+
+## Step 2: See what those colors look like when used for dataviz
+
+There are plenty of datasets around that can be used to create plots to get a feel for the color schemes we'll be using. The `penguins` set from `{palmerpenguins}` is one of my favorites: it contains both continuous data (e.g. flipper lengths) and categorical data (e.g. species), along with some NAs. And, because of the way the flipper and bill lengths group together into clusters, it's a great way of seeing how the colors highlight the different clusters of points. 
+
+Let's put together a basic plot that we can then apply our color schemes to:
+
+```{r, message=FALSE, warning=FALSE}
+categorical_penguins <- 
+  palmerpenguins::penguins %>%
+  ggplot() +
+  geom_point(aes(x = bill_length_mm, y = flipper_length_mm,
+                 color = sex, size = body_mass_g),
+             show.legend = F) +
+  labs(title = "Palmer Penguins", 
+       subtitle = "Look at them go!",
+       x = "Bill length",
+       y = "Flipper length") +
+  theme_minimal()
+
+categorical_penguins
+```
+
+I had an inkling this might happen, but when I created a plot using the client's logo colors a clear problem emerged: the green "popped" way more than the purple, meaning that whichever group ended up being green in our dataviz would be highlighted. 
+
+```{r}
+categorical_penguins + 
+  scale_color_manual(values = c("#43d293", "#530577"))
+```
+
+This wasn't the effect we were going for, so some tweaking was required. 
+
+My first step was to blend together the two colours, to see if we could get a "muted" green that tied in nicely with the original colors. I created `{monochromer}` for exactly this purpose:
+
+```{r}
+monochromeR::generate_palette("#530577", modification = "blend", 
+                              blend_colour = "#43d293", 
+                              n_colours = 6, view_palette = T)
+```
+
+The last color in this palette is the green with a touch of purple. After some experimenting, it was still a bit too bright, so, in discussion with the client, we decided to go for a purple that was one step towards the green, and green that was one step towards the purple as the two main colors to base the palettes on. 
+
+Here's the penguin plot again with those two colors. It looks much more balanced! 
+
+```{r}
+categorical_penguins + 
+  scale_color_manual(values = c("#50257B", "#488888"))
+
+```
+
+## Step 3: Check the colors work for people with different types of color vision
+
+Creating plots that work for as many readers as possible is important. Claire D. McWhite and Claus O. Wilke have made it easy for us #rstats users to check this with `{colorblindr}`, a package that simulates how plots look to readers with different color perception deficiencies.
+
+```{r}
+colorblindr::cvd_grid(
+  
+  categorical_penguins + 
+    scale_color_manual(values = c("#50257B", "#488888"))
+  
+)
+
+```
+
+The two main colors seem to come across well, but the NAs were getting lost in all but one of the plots. To rectify that, I created an NA color which was a faded version of the middle color between our two main colors:
+
+```{r}
+middle_col <- c(monochromeR::generate_palette("#50257B",
+                                                modification = "blend", 
+                                                blend_colour = "#488888", 
+                                                n_colours = 4, view_palette = T), "#488888")[3]
+
+NA_col <- monochromeR::generate_palette(middle_col, 
+                                        modification = "go_both_ways", 
+                                        n_colours = 5)[2]
+
+
+categorical_penguins + 
+  scale_color_manual(values = c("#50257B", "#488888"), na.value = NA_col)
+```
+
+That made the NAs blend more into the background. Next step, check again with {colorblindr}:
+
+```{r}
+
+colorblindr::cvd_grid(
+  
+  categorical_penguins + 
+    scale_color_manual(values = c("#50257B", "#488888"), na.value = NA_col)
+  
+)
+
+```
+
+The NAs can be perceived as a different color in all four of the plots - mission accomplished!
+
+
+## Step 4: Create color/fill scales
+
+In this project, were be creating a **lot** of plots! We have some comparing two groups, some comparing more and some using continuous data. We don't want to be adding those color schemes in every time, so let's create a few palettes we can call upon. First we need to get our extremes. We already have our "Purple-to-Green" anchor colors, but we also needed an all-purple palette and an all-green palette, so we needed a light purple and a light green to fade to:
+
+```{r}
+# Purple extremes
+monochromeR::generate_palette(colibri_pal_extremes[1], 
+                                             modification = "go_lighter", 
+                                             n_colours = 2, view_palette = T)
+
+# Green extremes
+monochromeR::generate_palette(colibri_pal_extremes[2], 
+                                             modification = "go_lighter", 
+                                             n_colours = 2, view_palette = T)
+```
+
+Next, we use those values to create palettes that we call upon within `scale_color/fill` functions. Note the NA_col applied to na_values from earlier in this post.   
+
+```{r}
+colibri_pal <- function(palette = "Main",
+                     reverse = FALSE,
+                     ...) {
+
+  colibri_palettes <- list(
+    "Main" = c("#50257B", "#488888"),
+    "Purple" =  c("#50257B", "#DCD3E4"),
+    "Green" = c("#488888", "#DAE7E7")
+  )
+
+  pal <- colibri_palettes[[palette]]
+
+  if (reverse)
+    pal <- rev(pal)
+
+  grDevices::colorRampPalette(pal, ...)
+
+}
+
+# Replace _color_ with _fill_ to create scale_fill_colibri_continuous
+scale_color_colibri_continuous <-
+  function(palette = "Main",
+           reverse = FALSE,
+           ...) {
+    pal <- colibri_pal(palette = palette, reverse = reverse)
+
+    ggplot2::scale_color_gradientn(colors = pal(256),
+                                   na.value = NA_col,
+                                   ...)
+
+  }
+
+# Replace _color_ with _fill_ to create scale_fill_colibri_discrete
+scale_color_colibri_discrete <-
+  function(palette = "Main",
+           reverse = FALSE,
+           ...) {
+    pal <- colibri_pal(palette = palette, reverse = reverse)
+
+    ggplot2::discrete_scale("color", paste0("colibri_", palette),
+                            na.value = NA_col,
+                            palette = pal, ...)
+
+  }
+
 ```
 
 
-Hook (why this is a good idea, see above)
 
-## Step 1: Get hold of the colours (client provided these ones, but otherwise colorpicker is a useful website)
+## Step 5: Align the text and grid lines with the color scheme for a polished look
 
+The final touch is to make the rest of the colors we see in each plot line up nicely with the color scheme: the grid lines and the text. For this, I used the "middle" color again as a basis, creating a "light text" color, a "light text" color (the same as the NAs - the color we want to blend into the backgound), and a "light text" color. 
 
-## Step 2: Play around with them using dummy data (very quick note on why I like palmerpenguins), see how they balance with each other (in our case, the green was too bright and needed to be toned down to work in dataviz)
+```{r}
 
+light_text_col <- NA_col
 
-## Step 3: Create color/fill scales (with easy to follow code example)
+dark_text_col <- monochromeR::generate_palette(middle_col, 
+                                               modification = "go_both_ways", 
+                                               n_colours = 5)[4]
 
+light_col <- monochromeR::generate_palette(middle_col, 
+                                           modification = "go_both_ways", 
+                                           n_colours = 5)[1]
 
-## Step 4: Put it all through colorblindr to see what it looks like and tweak accordingly
+```
 
+We can then use these to modify `theme_minimal()`, for example:
 
-## Step 5: Determine colours for the NAs and for Text as an extra nice touch
+```{r}
+# Example of one palette applied using the scale_color functions above + changing the text color
+
+```
+
+And here's the full set, making use of all the steps above. 
+
+```{r}
+# Code to generate 4 graphs using categorical / 3 continuous palettes (main, purple, green); can't use ones in github issues because font is also modified there
+
+```
+
 
