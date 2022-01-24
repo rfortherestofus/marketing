@@ -1,0 +1,28 @@
+---
+title: "Choosing a bespoke color scheme"
+author: "Cara Thompson"
+date: "24/01/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
+```
+
+
+Hook (why this is a good idea, see above)
+
+## Step 1: Get hold of the colours (client provided these ones, but otherwise colorpicker is a useful website)
+
+
+## Step 2: Play around with them using dummy data (very quick note on why I like palmerpenguins), see how they balance with each other (in our case, the green was too bright and needed to be toned down to work in dataviz)
+
+
+## Step 3: Create color/fill scales (with easy to follow code example)
+
+
+## Step 4: Put it all through colorblindr to see what it looks like and tweak accordingly
+
+
+## Step 5: Determine colours for the NAs and for Text as an extra nice touch
+
