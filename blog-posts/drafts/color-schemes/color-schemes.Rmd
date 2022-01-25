@@ -6,21 +6,21 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 library(magrittr)
 library(ggplot2)
 ```
 
 ### "Ooh look, a `ggplot()` plot!"
 
-In creating polished reports and visualisastions for our clients, that is never the reaction we're hoping for. Sure, the "I didn't know you could do that in R!" reaction is always fun, but what we want above all is for the plots and tables to blend in seamlessly with the rest of the client's aesthetic. Picking a color scheme that ties in with a client's brand or that evokes the subject matter behind the data is what allows the plot to contribute to, rather than detract from, the main story the client is seeking to tell. 
+In creating polished reports and visualizations for our clients, that is never the reaction we're hoping for. Sure, the "I didn't know you could do that in R!" reaction is always fun, but what we want above all is for the plots and tables to blend in seamlessly with the rest of the client's aesthetic. Picking a color scheme that ties in with a client's brand or that evokes the subject matter behind the data is what allows the plot to contribute to, rather than detract from, the main story the client is seeking to tell. 
 
 This post explores how we go about choosing an appropriate color scheme and how to create `scale_fill/color_discrete/continous()` to align all plots with that colour scheme, using the example of our recent project with Colibri Consulting.
 
 
 ## Step 1: Decide what colors to use
 
-In the case of this project, our client had a logo with two colors. She was able to give us the hex codes for those colours, which was handy, but there are plenty of online tools to help you pick out the hex colours in an image or even in a website. My personal go-to is [Color Picker Online](https://imagecolorpicker.com/en) which does what it says on the tin: it allows you to pinpoint different parts of an image or a website to extract their color codes. 
+In the case of this project, our client had a logo with two colors. She was able to give us the hex codes for those colours, which was handy, but there are plenty of online tools to help you pick out the hex colours in an image or even in a website. My personal go-to is [Color Picker Online](https://imagecolorpicker.com/en) which does what it says on the tin: it allows you to pick out different colors from an image or a website, and provides you with their hex codes. 
 
 So, back to Colibri Consulting. Our two starting colors were:
 - a deep purple: `#43d293`
@@ -49,7 +49,7 @@ categorical_penguins <-
 categorical_penguins
 ```
 
-I had an inkling this might happen, but when I created a plot using the client's logo colors a clear problem emerged: the green "popped" way more than the purple, meaning that whichever group ended up being green in our dataviz would be highlighted. 
+I had an inkling this might happen, but when I created a plot using the colors from the client's logo, the problem became clear: the green "popped" way more than the purple, meaning that whichever group ended up being green in our data viz would be highlighted to the detriment of the purple group. 
 
 ```{r}
 categorical_penguins + 
@@ -94,9 +94,9 @@ The two main colors seem to come across well, but the NAs were getting lost in a
 
 ```{r}
 middle_col <- c(monochromeR::generate_palette("#50257B",
-                                                modification = "blend", 
-                                                blend_colour = "#488888", 
-                                                n_colours = 4, view_palette = T), "#488888")[3]
+                                              modification = "blend", 
+                                              blend_colour = "#488888", 
+                                              n_colours = 4), "#488888")[3]
 
 NA_col <- monochromeR::generate_palette(middle_col, 
                                         modification = "go_both_ways", 
@@ -107,7 +107,7 @@ categorical_penguins +
   scale_color_manual(values = c("#50257B", "#488888"), na.value = NA_col)
 ```
 
-That made the NAs blend more into the background. Next step, check again with {colorblindr}:
+That made the NAs blend more into the background. Let's check it again with {colorblindr}:
 
 ```{r}
 
@@ -120,80 +120,106 @@ colorblindr::cvd_grid(
 
 ```
 
-The NAs can be perceived as a different color in all four of the plots - mission accomplished!
+The are a different color to the two main colours in all four of the plots - mission accomplished!
 
 
 ## Step 4: Create color/fill scales
 
-In this project, were be creating a **lot** of plots! We have some comparing two groups, some comparing more and some using continuous data. We don't want to be adding those color schemes in every time, so let's create a few palettes we can call upon. First we need to get our extremes. We already have our "Purple-to-Green" anchor colors, but we also needed an all-purple palette and an all-green palette, so we needed a light purple and a light green to fade to:
+In this project, we'll be creating a **lot** of plots! We have plots some comparing two groups, some requiring more colors, and some using continuous data. We don't want to be adding those colors manually every time! Instead, let's create a few palettes we can call upon. First we need to get our anchors at either end of the palettes. We already have our "Purple-to-Green" anchor colors, but we also needed an all-purple palette and an all-green palette, so we needed a light purple and a light green to fade to:
 
 ```{r}
 # Purple extremes
-monochromeR::generate_palette(colibri_pal_extremes[1], 
-                                             modification = "go_lighter", 
-                                             n_colours = 2, view_palette = T)
+monochromeR::generate_palette("#50257B", 
+                              modification = "go_lighter", 
+                              n_colours = 2, view_palette = T)
 
 # Green extremes
-monochromeR::generate_palette(colibri_pal_extremes[2], 
-                                             modification = "go_lighter", 
-                                             n_colours = 2, view_palette = T)
+monochromeR::generate_palette("#488888",
+                              modification = "go_lighter", 
+                              n_colours = 2, view_palette = T)
 ```
 
-Next, we use those values to create palettes that we call upon within `scale_color/fill` functions. Note the NA_col applied to na_values from earlier in this post.   
+Next, we use those values to create palettes that we call upon within `scale_color/fill` functions. Note the `NA_col` applied to `na_values` from earlier in this post.   
 
 ```{r}
 colibri_pal <- function(palette = "Main",
-                     reverse = FALSE,
-                     ...) {
-
+                        reverse = FALSE,
+                        ...) {
+  
   colibri_palettes <- list(
     "Main" = c("#50257B", "#488888"),
     "Purple" =  c("#50257B", "#DCD3E4"),
     "Green" = c("#488888", "#DAE7E7")
   )
-
+  
   pal <- colibri_palettes[[palette]]
-
+  
   if (reverse)
     pal <- rev(pal)
-
+  
   grDevices::colorRampPalette(pal, ...)
-
+  
 }
 
-# Replace _color_ with _fill_ to create scale_fill_colibri_continuous
-scale_color_colibri_continuous <-
-  function(palette = "Main",
-           reverse = FALSE,
-           ...) {
-    pal <- colibri_pal(palette = palette, reverse = reverse)
-
-    ggplot2::scale_color_gradientn(colors = pal(256),
-                                   na.value = NA_col,
-                                   ...)
-
-  }
-
-# Replace _color_ with _fill_ to create scale_fill_colibri_discrete
+# Discrete scales
 scale_color_colibri_discrete <-
   function(palette = "Main",
            reverse = FALSE,
            ...) {
     pal <- colibri_pal(palette = palette, reverse = reverse)
-
-    ggplot2::discrete_scale("color", paste0("colibri_", palette),
+    
+    ggplot2::discrete_scale("color", pal,
                             na.value = NA_col,
                             palette = pal, ...)
-
+    
   }
+
+scale_fill_colibri_discrete <-
+  function(palette = "Main",
+           reverse = FALSE,
+           ...) {
+    pal <- colibri_pal(palette = palette, reverse = reverse)
+    
+    ggplot2::discrete_scale("color", pal,
+                            na.value = NA_col,
+                            palette = pal, ...)
+    
+  }
+
+# Continuous scales
+scale_color_colibri_continuous <-
+  function(palette = "Main",
+           reverse = FALSE,
+           ...) {
+    pal <- colibri_pal(palette = palette, reverse = reverse)
+    
+    ggplot2::scale_color_gradientn(colors = pal(256),
+                                   na.value = NA_col,
+                                   ...)
+    
+  }
+
+scale_fill_colibri_continuous <-
+  function(palette = "Main",
+           reverse = FALSE,
+           ...) {
+    pal <- colibri_pal(palette = palette, reverse = reverse)
+    
+    ggplot2::scale_color_gradientn(colors = pal(256),
+                                   na.value = NA_col,
+                                   ...)
+    
+  }
+
+
 
 ```
 
 
 
-## Step 5: Align the text and grid lines with the color scheme for a polished look
+## Step 5: Align the text and grid lines with the color scheme for a more polished look
 
-The final touch is to make the rest of the colors we see in each plot line up nicely with the color scheme: the grid lines and the text. For this, I used the "middle" color again as a basis, creating a "light text" color, a "light text" color (the same as the NAs - the color we want to blend into the backgound), and a "light text" color. 
+The final touch is to make the rest of the colors we see in each plot line up nicely with the color scheme: the grid lines and the text. For this, I used the "middle" color again as a basis, creating a "light text" color, a "light text" color (the same as the NAs - the color we want to blend into the background), and a "light text" color. 
 
 ```{r}
 
@@ -209,18 +235,63 @@ light_col <- monochromeR::generate_palette(middle_col,
 
 ```
 
-We can then use these to modify `theme_minimal()`, for example:
+We can then use these to modify `theme_minimal()`:
 
 ```{r}
-# Example of one palette applied using the scale_color functions above + changing the text color
+
+categorical_penguins +
+  scale_fill_colibri_discrete("Main") +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_line(color = light_col),
+        text = element_text(color = light_text_col),
+        plot.subtitle = element_text(size = 14, color = light_text_col),
+        axis.ticks = element_blank(),
+        axis.text = element_text(color = light_text_col),
+        plot.title = element_text(color = dark_text_col, size = 20))
 
 ```
 
-And here's the full set, making use of all the steps above. 
+## Bringing it all together
+
+Here are some plots with continuous color scales, making use of all the steps above. 
+
+```{r, echo = F}
+
+continuous_penguins <- 
+  palmerpenguins::penguins %>%
+  ggplot() +
+  geom_point(aes(x = bill_length_mm, y = flipper_length_mm,
+                 shape = sex, size = body_mass_g, color = body_mass_g),
+             show.legend = F) +
+  labs(title = "Palmer Penguins", 
+       subtitle = "Look at them go!",
+       x = "Bill length",
+       y = "Flipper length") +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_line(color = light_col),
+        text = element_text(color = light_text_col),
+        plot.subtitle = element_text(size = 14, color = light_text_col),
+        axis.ticks = element_blank(),
+        axis.text = element_text(color = light_text_col),
+        plot.title = element_text(color = dark_text_col, size = 20))
+```
 
 ```{r}
-# Code to generate 4 graphs using categorical / 3 continuous palettes (main, purple, green); can't use ones in github issues because font is also modified there
+
+continuous_penguins +
+  scale_color_colibri_continuous()
+
+continuous_penguins +
+  scale_color_colibri_continuous("Green")
+
+continuous_penguins +
+  scale_color_colibri_continuous("Purple", reverse = T)
 
 ```
 
 
+There are other trick to move further away from the `ggplot()` defaults with fonts, margins, line heights, etc. But there's only so much we can cover in one post! We'll get to those another day. 
+
+In the meantime, happy plotting!
