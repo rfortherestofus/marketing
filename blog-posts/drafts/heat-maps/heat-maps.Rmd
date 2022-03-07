@@ -1,0 +1,143 @@
+---
+title: "Making heat maps with R"
+author: "Cara Thompson"
+date: "24/01/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(sf)
+library(tidycensus)
+library(janitor)
+library(hrbrthemes)
+library(here)
+library(patchwork)
+library(tidyverse)
+
+us_state_pop <- get_acs(
+  geography = "state", 
+  year = 2019,
+  variables = c("population" = "B01001_001"), 
+  geometry = TRUE)
+
+us_contiguous_pop <- us_state_pop %>% 
+  filter(!NAME %in% c("Alaska", "Hawaii", "Rhode Island", "Puerto Rico")) 
+
+us_contiguous_sf <- us_contiguous_pop %>% 
+  select(NAME)
+
+most_popular_streaming_service <- read_csv(here("blog-posts", "drafts", "heat-maps", "data", "most-popular-streaming-service.csv")) %>% 
+  clean_names()
+
+us_most_popular_streaming_sf <- us_contiguous_sf %>% 
+  left_join(most_popular_streaming_service,
+            by = c("NAME" = "state"))
+```
+
+We're often asked by clients to make maps, and 9 out of 10 times they ask us to make heat maps. They're more technically called choropleth, but heat maps are incredibly useful and easy to use maps.
+
+```{r}
+gg_fancy_us_pop <- us_contiguous_pop %>% 
+  ggplot() +
+  geom_sf(aes(fill = estimate)) +
+  scale_fill_viridis_c(labels = scales::number_format(scale = 1E-6, big.mark = ",", suffix = " Million"),
+                       name = NULL) +
+  labs(title = "State-level population of the contiguous United States",
+       subtitle = "Source: ACS Survey 2019") +
+  theme_void() %+%
+  theme_ipsum() +
+  theme(legend.position = "top",
+        legend.key.width = unit(3, "cm"),
+        panel.grid.major = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_blank())
+
+order_most_popular_service <- most_popular_streaming_service %>% 
+  count(streaming_service, sort = TRUE) %>% 
+  pull(streaming_service)
+
+colors_services <- list(
+  "Amazon Prime" = "#2A96D9",
+  "ESPN" = "#BE0002",
+  "Hulu" = "#35B12E",
+  "Netflix" = "black"
+)
+
+colors_services <- colors_services[order_most_popular_service]
+
+gg_fancy_us_streaming <- us_most_popular_streaming_sf %>% 
+  filter(!is.na(streaming_service)) %>% 
+  mutate(streaming_service = fct_relevel(streaming_service, order_most_popular_service)) %>% 
+  ggplot() +
+  geom_sf(aes(fill = streaming_service)) +
+  scale_fill_manual(values = colors_services,
+                    name = NULL) +
+  labs(title = "Most popular streaming service by state",
+       subtitle = "Source: ElectricalDirect survey 2021") +
+  theme_void() %+%
+  theme_ipsum() +
+  theme(legend.position = "right",
+        # legend.key.width = unit(3, "cm"),
+        panel.grid.major = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_blank())
+
+gg_fancy_us_pop + gg_fancy_us_streaming
+```
+
+
+At the their simplest, heat maps require two things:
+
+- Shapefiles for the regions of interest. In the example above these regions are states, but they could just as easily be countries or any country subdivision.
+
+- A value for each region of interest. This could be a numeric value (like population) or it could be a categorical variable.
+
+I really love mapping with R because it's fairly simple to start off and we can build really beautiful static and interactive maps. Our [mapping with R course](https://rfortherestofus.com/courses/mapping/) will take you through all the steps required to build choropleth. But let me take you through the basic steps so you know what's involved.
+
+## Shapefiles and the {sf} package
+
+The [sf](https://r-spatial.github.io/sf/) is the backbone of most mapping you'll do with R - including working with shapefiles. But we need to start out with a dataset first. To make things simple I'm going to use the [{tidycensus}](https://walker-data.com/tidycensus/) package to obtain the population for all US states
+
+```{r}
+library(tidycensus)
+us_state_pop <- get_acs(
+  geography = "state", 
+  year = 2019,
+  variables = c("population" = "B01001_001"), 
+  geometry = TRUE)
+
+us_state_pop
+```
+
+This thing looks a litle bit like a data.frame (or a tibble) - and that's because it is. An {sf} dataset contains columns and rows of data alongside the geospatial portion of the dataset. We can use this thing [inside of a tidyverse workflow](https://rfortherestofus.com/2019/06/what-is-a-tidyverse-centric-approach/) to extract just the contiguous United States:
+
+```{r}
+us_contiguous_pop <- us_state_pop %>% 
+  filter(!NAME %in% c("Alaska", "Hawaii", "Rhode Island", "Puerto Rico")) 
+us_contiguous_pop
+```
+
+If we hadn't of used {tidycensus} we'd have downloaded shapefiles from somewhere and read them into R with read_sf() from {sf}. I've selected the contiguous United States because it makes for a fairly square chart - which looks nice. In mapping we often have to make trade offs between what looks good and the complexity of our data.
+
+## Maps with one function using {maview}
+
+The {mapview} package makes using R for mapping wonderful. It will take any geospatial dataset, whether it's from {sf}, {sp}, {raster}, {stars} and many others and ... just visualise it.
+
+```{r}
+library(mapview)
+us_contiguous_pop %>% 
+  mapview()
+```
+
+It's main use case is for sanity checking - does my data look right? We can turn this into a heat map by giving the `zcol` argument the name of a column:
+
+```{r}
+us_contiguous_pop %>% 
+  mapview(zcol = "estimate")
+```
+
+This is literally as far as I ever go with {mapview}. My next step would be to decide between making a static map with {ggplot2} and an interactive one with {leaflet}
+
+
+
