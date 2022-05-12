@@ -1,6 +1,6 @@
 ---
 title: "Making heat maps with R"
-author: "Cara Thompson"
+author: "Charlie Hadley"
 date: "24/01/2022"
 output: html_document
 ---
@@ -14,6 +14,9 @@ library(hrbrthemes)
 library(here)
 library(patchwork)
 library(tidyverse)
+library(mapview)
+library(scales)
+library(leaflet)
 
 us_state_pop <- get_acs(
   geography = "state", 
@@ -133,6 +136,13 @@ us_contiguous %>%
   mapview(zcol = "estimate")
 ```
 
+```{r}
+us_contiguous %>% 
+  mapview(zcol = "estimate") %>% 
+  htmlwidgets::saveWidget("mapview-heatmap.html")
+```
+
+
 This is literally as far as I ever go with {mapview}. It's job is to quickly visualise your map data, and that's it. My next step would be to decide between making a static map with {ggplot2} and an interactive one with {leaflet}
 
 ## Static maps with {ggplot2}
@@ -208,8 +218,29 @@ us_contiguous %>%
               popup = ~label_state(NAME, estimate)) %>% 
   addLegend(pal = pal_state_pop,
             values = ~estimate,
-            opacity = 1)
+            opacity = 1) 
 ```
+
+```{r}
+pal_state_pop <- colorNumeric("viridis", us_contiguous$estimate)
+
+label_state <- function(state, pop){
+  str_glue("{state} with population of {pop}")
+}
+
+us_contiguous %>% 
+  leaflet() %>% 
+  addPolygons(weight = 1,
+              color = "white",
+              fillColor = ~pal_state_pop(estimate),
+              fillOpacity = 1,
+              popup = ~label_state(NAME, estimate)) %>% 
+  addLegend(pal = pal_state_pop,
+            values = ~estimate,
+            opacity = 1) %>% 
+  htmlwidgets::saveWidget("leaflet-heatmap.html")
+```
+
 
 ## Going further with heat maps
 
